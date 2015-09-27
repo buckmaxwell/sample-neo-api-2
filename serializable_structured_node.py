@@ -720,7 +720,7 @@ class SerializableStructuredNode(StructuredNode):
         try:
             this_resource = cls.nodes.get(id=id, active=True)
             data = request_json['data']
-            if data['type'] != cls.type:
+            if data['type'] != cls.__type__:
                 raise WrongTypeError('type must match the type of the resource being updated.')
 
             attributes = data.get('attributes')
@@ -896,7 +896,6 @@ class SerializableStructuredNode(StructuredNode):
                     the_new_node = cls.get_class_from_type(rsrc_identifier['type']).nodes.get(id=rsrc_identifier['id'])
                     rel_attrs = rsrc_identifier.get('meta')
                     if not rel_attrs or isinstance(rel_attrs, dict):
-                        print "we good"
                         related_collection.connect(the_new_node, rel_attrs)
                     else:
                         raise WrongTypeError
@@ -1006,7 +1005,12 @@ class SerializableStructuredNode(StructuredNode):
                     related_collection.disconnect(item)
                 for identifier in data:  # adds all new connections
                     the_new_node = cls.get_class_from_type(identifier['type']).nodes.get(id=identifier['id'])
-                    related_collection.connect(the_new_node)
+                    the_rel = related_collection.connect(the_new_node)
+                    meta = identifier.get('meta')
+                    if meta:
+                        for k in meta.keys():
+                            setattr(the_rel, k, meta[k])
+                    the_rel.save()
 
             r = make_response('')
             r.status_code = http_error_codes.NO_CONTENT

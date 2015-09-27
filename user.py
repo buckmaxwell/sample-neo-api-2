@@ -13,6 +13,13 @@ class MomRel(SerializableStructuredRel):
     met = StringProperty()  # => required
 
 
+class FriendRel(SerializableStructuredRel):
+    __type__ = 'friend'  # => __type__ must be specified and the same as the default for type
+
+    type = StringProperty(default="friend")
+    met = StringProperty()
+
+
 class User(SerializableStructuredNode):
     """
     This is an example class for showing how a SerializableStructuredNode is put together. ALL rules for StructuredNode\
@@ -37,7 +44,7 @@ class User(SerializableStructuredNode):
     gender = StringProperty()
 
     # RELATIONSHIPS
-    friends = Relationship('User', 'HAS_FRIEND', model=SerializableStructuredRel)
+    friends = Relationship('User', 'HAS_FRIEND', model=FriendRel)
     mom = RelationshipTo('User', 'HAS_MOM', cardinality=ZeroOrOne, model=MomRel)
 
 
