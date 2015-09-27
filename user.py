@@ -13,7 +13,7 @@ class User(SerializableStructuredNode):
     http://neomodel.readthedocs.org/en/latest/.
     """
 
-    __index__ = 'User'
+    __type__ = 'users'  # => __type__ must be specified and the same as the default for type
 
     # INFO
     version = '1.0.0'  # => A version is not required but is a good idea
@@ -24,8 +24,8 @@ class User(SerializableStructuredNode):
 
     # ATTRIBUTES -- NOTE: 'type' and 'id' are required for json api specification compliance
     type = StringProperty(default='users')  # => required
-    id = AliasProperty(to='email')  # => required
-    email = StringProperty(unique_index=True, required=True)
+    id = StringProperty(unique_index=True, required=True)  # => required
+    email = AliasProperty(to='id')
     password = StringProperty(required=True)
     gender = StringProperty()
 
