@@ -3,7 +3,14 @@ __email__ = 'maxbuckdeveloper@gmail.com'
 __version__ = '1.0.0'
 
 from neomodel import (StringProperty, AliasProperty, RelationshipTo, Relationship, ZeroOrOne)
-from serializable_structured_node import SerializableStructuredNode, SerializableStructuredRel
+from serializable_structured_node import SerializableStructuredNode, SerializableStructuredRel, DateTimeProperty
+
+
+class MomRel(SerializableStructuredRel):
+    __type__ = 'mom'  # => __type__ must be specified and the same as the default for type
+
+    type = StringProperty(default="mom")  # => required, unique name for model
+    met = StringProperty()  # => required
 
 
 class User(SerializableStructuredNode):
@@ -23,7 +30,7 @@ class User(SerializableStructuredNode):
     dates = ['birthday']  # => Format datetime object as date because datetime.date objects cannot be json encoded
 
     # ATTRIBUTES -- NOTE: 'type' and 'id' are required for json api specification compliance
-    type = StringProperty(default='users')  # => required
+    type = StringProperty(default='users')  # => required, unique name for model
     id = StringProperty(unique_index=True, required=True)  # => required
     email = AliasProperty(to='id')
     password = StringProperty(required=True)
@@ -31,4 +38,7 @@ class User(SerializableStructuredNode):
 
     # RELATIONSHIPS
     friends = Relationship('User', 'HAS_FRIEND', model=SerializableStructuredRel)
-    mom = RelationshipTo('User', 'HAS_MOM', cardinality=ZeroOrOne, model=SerializableStructuredRel)
+    mom = RelationshipTo('User', 'HAS_MOM', cardinality=ZeroOrOne, model=MomRel)
+
+
+

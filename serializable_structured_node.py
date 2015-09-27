@@ -11,9 +11,8 @@ import application_codes
 from errors import WrongTypeError, ParameterNotSupported
 from datetime import datetime
 import hashlib
-from uuid import uuid4
 
-base_url = os.environ.get('BASE_API_URL', 'http://localhost:5000/v1')
+base_url = os.environ.get('BASE_API_URL', 'http://localhost:10200/v1')
 CONTENT_TYPE = "application/vnd.api+json; charset=utf-8"
 
 
@@ -195,24 +194,24 @@ class SerializableStructuredNode(StructuredNode):
                 )
             )
 
-            relationships = [row["rel"] for row in results]
+            # TODO: For line below SerializableStructuredRel must be set to specific rel model type
+
+            relclass = SerializableStructuredRel.get_relclass_from_type(results[0][0]['type'])
+            relationships = [relclass.inflate(row["rel"]) for row in results]
             related_node_or_nodes = [self.inflate(row["end_node"]) for row in results]
 
             if not type(getattr(self, related_collection_type)) == ZeroOrOne:
                 response['data'] = list()
                 for i, the_node in enumerate(related_node_or_nodes):
                     if the_node.active:
-                        print SerializableStructuredRel.get_resource_identifier_object(relationships[i])
-                        response['data'].append(relationships[i].get_resource_identifier_object())
-                        print "i's vury hur"
+                        response['data'].append(relationships[i].get_resource_identifier_object(the_node))
                         response['included'].append(the_node.get_resource_object())
-            elif related_node_or_nodes:
-                # TODO: Determine if this is necessary or should throw an error
+            elif related_node_or_nodes:  # The collection contains 1 item
                 the_node = related_node_or_nodes[0]
                 response['data'] = {'type': the_node.type, 'id': the_node.id}
+                response['data'] = relationships[0].get_resource_identifier_object(the_node)
                 response['included'].append(the_node.get_resource_object())
-            else:
-                # TODO: Determine if this is necessary or should throw an error
+            else:  # The collection is has Cardinality ZeroOrOne and is zero, so null
                 response['data'] = None
 
             r = make_response(jsonify(response))
@@ -436,7 +435,7 @@ class SerializableStructuredNode(StructuredNode):
                 relationship = results[0]["rel"]
                 the_node = self.inflate(results[0]["end_node"])
                 if the_node.active:
-                    response['data'] = relationship.get_resource_identifier_object()
+                    response['data'] = relationship.get_resource_identifier_object(the_node)
                     response['included'].append(the_node.get_resource_object())
             else:
                 raise DoesNotExist
@@ -544,9 +543,6 @@ class SerializableStructuredNode(StructuredNode):
             r = application_codes.error_response([application_codes.RESOURCE_NOT_FOUND])
 
         return r
-
-
-
 
     @classmethod
     def get_resource_or_collection(cls, request_args, id=None):
@@ -991,8 +987,18 @@ class SerializableStructuredNode(StructuredNode):
                     the_new_node = cls.get_class_from_type(data['type']).nodes.get(id=data['id'])
                     if related_collection.single():  # update the relationship
                         related_collection.reconnect(related_collection.single(), the_new_node)
+                        the_rel = eval('related_collection.relationship(the_new_node)'.format(
+                            start_node=this_resource, relname=related_collection_name)
+                        )
+                        meta = data.get('meta')
+                        if meta:
+                            for k in meta.keys():
+                                setattr(the_rel, k, meta[k])
+                        the_rel.save()
+                        print the_rel.met
+
                     else:  # create the relationship
-                        related_collection.connect(the_new_node)
+                        related_collection.connect(the_new_node, data.get('meta'))
 
             else:  # Cardinality > 1 so this is a collection of objects
                 old_nodes = related_collection.all()
@@ -1058,6 +1064,7 @@ class SerializableStructuredNode(StructuredNode):
         return None
 
 
+
 class EnumeratedTypeError(Exception):
     pass
 
@@ -1067,25 +1074,36 @@ class SerializableStructuredRel(StructuredRel):
     The Base Relationship that all Structured Relationships must inherit from.  All relationships should be structured \
     starting version 1.1.0 -- okay to use model=SerializableStructuredRel
     """
-    # TODO: For get relationships.  This is fucky.  Fixxxit
     secret = []
     updated = DateTimeProperty(default=datetime.now())
     created = DateTimeProperty(default=datetime.now())
+    type = StringProperty(default="serializable_structured_rel")
+
+    def get_resource_identifier_object(self, end_node):
+        try:
+            response = dict()
+            response['id'] = end_node.id
+            response['type'] = end_node.type
+            response['meta'] = dict()
+
+            props = self.defined_properties()
+            print self.__class__
+            for attr_name in props.keys():
+                print attr_name
+                if attr_name not in self.secret:
+                    response['meta'][attr_name] = getattr(self, attr_name)
+
+            return response
+        except Exception as e:
+            print type(e), e
+            raise
 
     @classmethod
-    def get_resource_identifier_object(cls, ssr):
-        response = dict()
-        print type(ssr)
-        response['id'] = ssr.end_node().id
-        response['type'] = ssr.end_node().type
-        response['meta'] = dict()
-
-        props = ssr.defined_properties()
-        for attr_name in props.keys():
-            if attr_name not in ssr.secret:
-                response['meta'][attr_name] = getattr(ssr, attr_name)
-
-        return response
+    def get_relclass_from_type(cls, the_type):
+        for the_cls in cls.__subclasses__():
+            if the_cls.__type__ == the_type:
+                return the_cls
+        return None
 
 
 
